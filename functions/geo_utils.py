@@ -1,0 +1,99 @@
+import numpy as np
+from rasterio.transform import rowcol, xy
+from pyproj import CRS, Transformer
+
+
+def meters_per_degree(radius):
+    return (np.pi * radius) / 180.0
+
+
+def compute_meters_per_pixel(meta_data):
+    transform = meta_data['transform']
+    unit_type = meta_data['units']
+    radius = meta_data['radius']
+    rows = meta_data['height']
+
+    res_x = abs(transform.a)
+    res_y = abs(transform.e)
+
+    if unit_type == 'meters':
+        return res_x, res_y
+
+    if unit_type == 'degrees':
+        mpd = meters_per_degree(radius)
+        mpp_y = res_y * mpd
+
+        row_indices = np.arange(rows)
+        latitudes = transform.f + (transform.e * row_indices)
+        scale = np.cos(np.deg2rad(latitudes))
+
+        mpp_x = (res_x * mpd * scale)[:, np.newaxis]
+        mpp_x[mpp_x == 0] = 1e-6
+        return mpp_x, mpp_y
+
+    raise ValueError(f"Unknown unit: {unit_type}")
+
+
+def geo_to_pixel(meta_data, lon, lat, as_int=True):
+    transform = meta_data['transform']
+    op = round if as_int else float
+    r, c = rowcol(transform, lon, lat, op=op)
+    return r, c
+
+
+def pixel_to_geo(meta_data, row, col):
+    transform = meta_data['transform']
+    lon, lat = xy(transform, row, col)
+    return lon, lat
+
+
+def surface_distance(meta_data, lon1, lat1, lon2, lat2):
+    radius = meta_data['radius']
+    mpd = meters_per_degree(radius)
+    mean_lat = np.deg2rad((lat1 + lat2) / 2.0)
+    dx = (lon2 - lon1) * mpd * np.cos(mean_lat)
+    dy = (lat2 - lat1) * mpd
+    return float(np.hypot(dx, dy))
+
+
+def build_projected_grid(meta_data, step=1):
+    transform = meta_data['transform']
+    unit_type = meta_data['units']
+    radius = meta_data['radius']
+    height = meta_data['height']
+    width = meta_data['width']
+
+    rows = np.arange(0, height, step)
+    cols = np.arange(0, width, step)
+    cols_grid, rows_grid = np.meshgrid(cols, rows)
+
+    a, b, c = transform.a, transform.b, transform.c
+    d, e, f = transform.d, transform.e, transform.f
+    x = c + (a * cols_grid) + (b * rows_grid)
+    y = f + (d * cols_grid) + (e * rows_grid)
+
+    if unit_type == 'degrees':
+        center_lon = c + (width / 2.0) * a
+        center_lat = f + (height / 2.0) * e
+
+        src_crs = CRS.from_dict({
+            'proj': 'longlat',
+            'a': radius,
+            'b': radius,
+            'no_defs': True
+        })
+
+        proj_crs = CRS.from_dict({
+            'proj': 'ortho',
+            'lat_0': center_lat,
+            'lon_0': center_lon,
+            'a': radius,
+            'b': radius,
+            'units': 'm',
+            'no_defs': True
+        })
+
+        transformer = Transformer.from_crs(src_crs, proj_crs, always_xy=True)
+        x, y = transformer.transform(x, y)
+
+    return x, y
