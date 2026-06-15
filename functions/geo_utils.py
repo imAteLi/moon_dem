@@ -24,11 +24,12 @@ def compute_meters_per_pixel(meta_data):
         mpp_y = res_y * mpd
 
         row_indices = np.arange(rows)
-        latitudes = transform.f + (transform.e * row_indices)
+        latitudes = transform.f + (transform.e * (row_indices + 0.5))
         scale = np.cos(np.deg2rad(latitudes))
 
         mpp_x = (res_x * mpd * scale)[:, np.newaxis]
-        mpp_x[mpp_x == 0] = 1e-6
+        mpp_x = np.clip(mpp_x, 1e-6, None)
+
         return mpp_x, mpp_y
 
     raise ValueError(f"Unknown unit: {unit_type}")
@@ -56,15 +57,21 @@ def surface_distance(meta_data, lon1, lat1, lon2, lat2):
     return float(np.hypot(dx, dy))
 
 
-def build_projected_grid(meta_data, step=1):
+def build_projected_grid(meta_data, step=1, as_edges=False):
     transform = meta_data['transform']
     unit_type = meta_data['units']
     radius = meta_data['radius']
     height = meta_data['height']
     width = meta_data['width']
 
-    rows = np.arange(0, height, step)
-    cols = np.arange(0, width, step)
+    if as_edges:
+        n_rows = len(np.arange(0, height, step))
+        n_cols = len(np.arange(0, width, step))
+        rows = (np.arange(n_rows + 1) - 0.5) * step
+        cols = (np.arange(n_cols + 1) - 0.5) * step
+    else:
+        rows = np.arange(0, height, step)
+        cols = np.arange(0, width, step)
     cols_grid, rows_grid = np.meshgrid(cols, rows)
 
     a, b, c = transform.a, transform.b, transform.c

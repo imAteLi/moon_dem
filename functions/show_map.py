@@ -8,11 +8,11 @@ def create_map_plot(data, meta_data, cmap, color_label, title, vmin=None, max_di
     step = max(1, int(np.ceil(max(height, width) / max_display_dim)))
 
     data_ds = data[::step, ::step]
-    plot_x, plot_y = build_projected_grid(meta_data, step=step)
+    plot_x, plot_y = build_projected_grid(meta_data, step=step, as_edges=True)
 
     fig = Figure(figsize=(6, 5), dpi=100)
     ax = fig.add_subplot(111)
-    mesh = ax.pcolormesh(plot_x, plot_y, data_ds, cmap=cmap, shading='auto', vmin=vmin)
+    mesh = ax.pcolormesh(plot_x, plot_y, data_ds, cmap=cmap, shading='flat', vmin=vmin)
 
     ax.set_xlabel("Projected X (m)")
     ax.set_ylabel("Projected Y (m)")
