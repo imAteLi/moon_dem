@@ -1,0 +1,17 @@
+# 数据文件
+/data/
+
+# 虚拟环境
+venv/
+.venv/
+env/
+
+# PyCharm 配置(整个忽略)
+.idea/
+
+# Python 缓存
+__pycache__/
+*.pyc
+
+# 环境变量 / 密钥
+.env
