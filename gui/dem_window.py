@@ -4,10 +4,8 @@ from tkinter import filedialog, messagebox
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
 
 from functions.load_dem import load_dem_data
-from functions.show_dem import create_dem_plot
-
+from functions.show_map import create_dem_plot, create_slope_plot
 from functions.calc_slope import calculate_slope_map
-from functions.show_slope import create_slope_plot
 
 class DEMApp:
     def __init__(self, root):
@@ -16,6 +14,7 @@ class DEMApp:
         self.root.geometry("1000x600")
 
         # Data state
+        self.full_meta_data = None
         self.current_dem_data = None
         self.current_meta_data = None
 
@@ -56,6 +55,19 @@ class DEMApp:
         self.txt_info.insert(tk.END, "Need to load first")
         self.txt_info.config(state=tk.DISABLED)
 
+    def _set_info(self, text):
+        self.txt_info.config(state=tk.NORMAL)
+        self.txt_info.delete(1.0, tk.END)
+        self.txt_info.insert(tk.END, text)
+        self.txt_info.config(state=tk.DISABLED)
+
+    def _draw_figure(self, fig):
+        for widget in self.right_panel.winfo_children():
+            widget.destroy()
+        canvas = FigureCanvasTkAgg(fig, master=self.right_panel)
+        canvas.draw()
+        canvas.get_tk_widget().pack(fill=tk.BOTH, expand=True)
+
     def open_file_dialog(self):
         file_path = filedialog.askopenfilename(filetypes=[("GeoTIFF", "*.tif")])
         if file_path:
@@ -66,6 +78,7 @@ class DEMApp:
             result = load_dem_data(file_path)
 
             # Store data to state
+            self.full_meta_data = result
             self.current_dem_data = result["data"]
             self.current_meta_data = result
 
@@ -87,7 +100,7 @@ class DEMApp:
         nodata = self.current_meta_data['nodata']
         radius = self.current_meta_data['radius']
 
-        info_text = (
+        self._set_info(
             f"File path: {file_path}\n"
             f"----------------------------------------\n"
             f"Size: {rows} rows x {cols} cols\n"
@@ -98,26 +111,13 @@ class DEMApp:
             f"Radius: {radius}\n"
         )
 
-        self.txt_info.config(state=tk.NORMAL)
-        self.txt_info.delete(1.0, tk.END)
-        self.txt_info.insert(tk.END, info_text)
-        self.txt_info.config(state=tk.DISABLED)
-
     def show_dem_image(self):
         if self.current_dem_data is None:
             messagebox.showwarning("Warning", "Need to load first")
             return
 
-        # Clear image
-        for widget in self.right_panel.winfo_children():
-            widget.destroy()
-
         try:
-            fig = create_dem_plot(self.current_dem_data, self.current_meta_data)
-            canvas = FigureCanvasTkAgg(fig, master=self.right_panel)
-            canvas.draw()
-            canvas.get_tk_widget().pack(fill=tk.BOTH, expand=True)
-
+            self._draw_figure(create_dem_plot(self.current_dem_data, self.current_meta_data))
         except Exception as e:
             messagebox.showerror("Error", str(e))
 
@@ -126,18 +126,8 @@ class DEMApp:
             messagebox.showwarning("Warning", "Need to load first")
             return
 
-        # Clear image
-        for widget in self.right_panel.winfo_children():
-            widget.destroy()
-
         try:
-            slope_data = calculate_slope_map(self.current_dem_data, self.current_meta_data)
-
-            fig = create_slope_plot(slope_data, self.current_meta_data)
-
-            canvas = FigureCanvasTkAgg(fig, master=self.right_panel)
-            canvas.draw()
-            canvas.get_tk_widget().pack(fill=tk.BOTH, expand=True)
-
+            slope = calculate_slope_map(self.current_dem_data, self.current_meta_data)
+            self._draw_figure(create_slope_plot(slope, self.current_meta_data))
         except Exception as e:
             messagebox.showerror("Calculation Error", str(e))
