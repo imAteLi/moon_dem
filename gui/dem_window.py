@@ -91,8 +91,8 @@ class DEMApp:
 
     def update_info_display(self, file_path):
         # Update meta information
-        data_min = np.nanmin(self.current_dem_data)
-        data_max = np.nanmax(self.current_dem_data)
+        data_min = self.current_dem_data.min()
+        data_max = self.current_dem_data.max()
         rows, cols = self.current_dem_data.shape
 
         crs_info = self.current_meta_data['crs'].to_string() if self.current_meta_data['crs'] else "Unknown"
