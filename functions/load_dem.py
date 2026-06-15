@@ -1,4 +1,6 @@
 import rasterio
+from pyproj import CRS as PyCRS
+
 
 def load_dem_data(file_path):
     try:
@@ -19,8 +21,10 @@ def load_dem_data(file_path):
             default_radius = 1737400.0
             radius = default_radius
             try:
-                if file.crs is not None and getattr(file.crs, 'semi_major_axis', None):
-                    radius = file.crs.semi_major_axis
+                if file.crs is not None:
+                    pc = PyCRS.from_user_input(file.crs.to_wkt())
+                    if pc.ellipsoid is not None and pc.ellipsoid.semi_major_metre:
+                        radius = pc.ellipsoid.semi_major_metre
             except Exception:
                 print("Unable to extract radius, using default radius")
 
