@@ -1,7 +1,7 @@
 import numpy as np
 from scipy.ndimage import map_coordinates
 
-from functions.geo_utils import geo_to_pixel, pixel_to_geo, surface_distance
+from functions.geo_utils import geo_to_pixel, pixel_to_geo, surface_distance, bearing_between, geo_offset
 
 
 def _sample_elevation(z, rows, cols):
@@ -76,3 +76,24 @@ def line_of_sight(dem_data, meta_data, observer, target, n_samples=None, clearan
             'lats': lats,
         },
     }
+
+
+def traverse_edges(dem_data, meta_data, center, point_a, radius, step_deg=10.0, clearance=0.0):
+    lon0, lat0 = center
+    lon_a, lat_a = point_a
+    start_bearing = float(bearing_between(meta_data, lon0, lat0, lon_a, lat_a))
+
+    n = int(round(360.0 / step_deg))
+    results = []
+    for i in range(n):
+        bearing = (start_bearing + i * step_deg) % 360.0
+        lon_e, lat_e = geo_offset(meta_data, lon0, lat0, radius, bearing)
+        los = line_of_sight(dem_data, meta_data, (lon_e, lat_e), (lon0, lat0), clearance=clearance)
+        results.append({
+            'bearing': bearing,
+            'edge_lonlat': (lon_e, lat_e),
+            'blocked': los['blocked'],
+            'obstacle_dist_to_bottom': los['obstacle_dist_to_bottom'],
+        })
+
+    return results
