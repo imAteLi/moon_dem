@@ -119,3 +119,25 @@ def circle_mask(meta_data, lon0, lat0, radius):
 
     dist = surface_distance(meta_data, lon0, lat0, lon, lat)
     return dist <= radius
+
+
+def to_local_xy(meta_data, lon0, lat0, lon, lat):
+    mpd = meters_per_degree(meta_data['radius'])
+    east = (lon - lon0) * mpd * np.cos(np.deg2rad(lat0))
+    north = (lat - lat0) * mpd
+    return east, north
+
+
+def bearing_between(meta_data, lon0, lat0, lon1, lat1):
+    east, north = to_local_xy(meta_data, lon0, lat0, lon1, lat1)
+    return np.degrees(np.arctan2(east, north)) % 360.0
+
+
+def geo_offset(meta_data, lon0, lat0, distance, bearing_deg):
+    mpd = meters_per_degree(meta_data['radius'])
+    b = np.deg2rad(bearing_deg)
+    east = distance * np.sin(b)
+    north = distance * np.cos(b)
+    lon = lon0 + east / (mpd * np.cos(np.deg2rad(lat0)))
+    lat = lat0 + north / mpd
+    return lon, lat
