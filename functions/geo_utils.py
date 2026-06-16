@@ -54,7 +54,7 @@ def surface_distance(meta_data, lon1, lat1, lon2, lat2):
     mean_lat = np.deg2rad((lat1 + lat2) / 2.0)
     dx = (lon2 - lon1) * mpd * np.cos(mean_lat)
     dy = (lat2 - lat1) * mpd
-    return float(np.hypot(dx, dy))
+    return np.hypot(dx, dy)
 
 
 def build_projected_grid(meta_data, step=1, as_edges=False):
@@ -104,3 +104,18 @@ def build_projected_grid(meta_data, step=1, as_edges=False):
         x, y = transformer.transform(x, y)
 
     return x, y
+
+
+def circle_mask(meta_data, lon0, lat0, radius):
+    height = meta_data['height']
+    width = meta_data['width']
+    transform = meta_data['transform']
+
+    rows = np.arange(height)[:, np.newaxis]
+    cols = np.arange(width)[np.newaxis, :]
+
+    lon = transform.c + transform.a * (cols + 0.5) + transform.b * (rows + 0.5)
+    lat = transform.f + transform.d * (cols + 0.5) + transform.e * (rows + 0.5)
+
+    dist = surface_distance(meta_data, lon0, lat0, lon, lat)
+    return dist <= radius
