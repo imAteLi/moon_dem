@@ -57,10 +57,45 @@ def surface_distance(meta_data, lon1, lat1, lon2, lat2):
     return np.hypot(dx, dy)
 
 
+def build_geo_transformer(meta_data):
+    if meta_data['units'] != 'degrees':
+        return None
+
+    transform = meta_data['transform']
+    radius = meta_data['radius']
+    width = meta_data['width']
+    height = meta_data['height']
+
+    center_lon = transform.c + (width / 2.0) * transform.a
+    center_lat = transform.f + (height / 2.0) * transform.e
+
+    src_crs = CRS.from_dict({
+        'proj': 'longlat',
+        'a': radius,
+        'b': radius,
+        'no_defs': True
+    })
+    proj_crs = CRS.from_dict({
+        'proj': 'ortho',
+        'lat_0': center_lat,
+        'lon_0': center_lon,
+        'a': radius,
+        'b': radius,
+        'units': 'm',
+        'no_defs': True
+    })
+    return Transformer.from_crs(src_crs, proj_crs, always_xy=True)
+
+
+def project_points(meta_data, lon, lat):
+    transformer = build_geo_transformer(meta_data)
+    if transformer is None:
+        return lon, lat
+    return transformer.transform(lon, lat)
+
+
 def build_projected_grid(meta_data, step=1, as_edges=False):
     transform = meta_data['transform']
-    unit_type = meta_data['units']
-    radius = meta_data['radius']
     height = meta_data['height']
     width = meta_data['width']
 
@@ -79,28 +114,8 @@ def build_projected_grid(meta_data, step=1, as_edges=False):
     x = c + (a * cols_grid) + (b * rows_grid)
     y = f + (d * cols_grid) + (e * rows_grid)
 
-    if unit_type == 'degrees':
-        center_lon = c + (width / 2.0) * a
-        center_lat = f + (height / 2.0) * e
-
-        src_crs = CRS.from_dict({
-            'proj': 'longlat',
-            'a': radius,
-            'b': radius,
-            'no_defs': True
-        })
-
-        proj_crs = CRS.from_dict({
-            'proj': 'ortho',
-            'lat_0': center_lat,
-            'lon_0': center_lon,
-            'a': radius,
-            'b': radius,
-            'units': 'm',
-            'no_defs': True
-        })
-
-        transformer = Transformer.from_crs(src_crs, proj_crs, always_xy=True)
+    transformer = build_geo_transformer(meta_data)
+    if transformer is not None:
         x, y = transformer.transform(x, y)
 
     return x, y
