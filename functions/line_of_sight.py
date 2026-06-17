@@ -1,21 +1,14 @@
 import numpy as np
 from scipy.ndimage import map_coordinates
 
-from functions.geo_utils import geo_to_pixel, pixel_to_geo, surface_distance, bearing_between, geo_offset, meters_per_degree
+from functions.geo_utils import geo_to_pixel, surface_distance, bearing_between, geo_offset
 
 
 def _sample_elevation(z, rows, cols):
     return map_coordinates(z, [rows, cols], order=1, mode='nearest')
 
 
-def _ground_sample_distance(meta_data):
-    res = max(abs(meta_data['transform'].a), abs(meta_data['transform'].e))
-    if meta_data['units'] == 'degrees':
-        return res * meters_per_degree(meta_data['radius'])
-    return res
-
-
-def line_of_sight(dem_data, meta_data, observer, target, n_samples=None, clearance=0.0, end_margin_factor=1.5):
+def line_of_sight(dem_data, meta_data, observer, target, n_samples=None, clearance=0.0):
     if np.ma.is_masked(dem_data):
         z = dem_data.filled(np.nan)
     else:
@@ -34,35 +27,34 @@ def line_of_sight(dem_data, meta_data, observer, target, n_samples=None, clearan
     rows = np.linspace(r_o, r_t, n_samples)
     cols = np.linspace(c_o, c_t, n_samples)
 
-    elev = _sample_elevation(z, rows, cols)
-    lons, lats = pixel_to_geo(meta_data, rows, cols)
-    lons = np.asarray(lons)
-    lats = np.asarray(lats)
+    elev = _sample_elevation(z, rows - 0.5, cols - 0.5)
+
+    lons = np.linspace(lon_o, lon_t, n_samples)
+    lats = np.linspace(lat_o, lat_t, n_samples)
 
     dist_from_obs = surface_distance(meta_data, lon_o, lat_o, lons, lats)
     dist_to_target = surface_distance(meta_data, lons, lats, lon_t, lat_t)
 
     total = dist_from_obs[-1]
     if total <= 0:
-        raise ValueError("Negative distance")
+        raise ValueError("Observer and target are at the same place")
 
     t = dist_from_obs / total
     z_los = elev[0] + t * (elev[-1] - elev[0])
 
     poke = elev - z_los
 
-    skip = end_margin_factor * _ground_sample_distance(meta_data)
-    valid = (dist_from_obs > skip) & (dist_to_target > skip) & np.isfinite(poke)
-
-    has_nodata = bool(np.isnan(elev[1:-1]).any())
+    interior = np.arange(1, n_samples - 1)
+    has_nodata = bool(np.isnan(elev[interior]).any())
 
     blocked = False
     obstacle_idx = None
     obstacle_dist_to_bottom = None
     obstacle_lonlat = None
 
-    if valid.any():
-        k = int(np.argmax(np.where(valid, poke, -np.inf)))
+    finite = interior[np.isfinite(poke[interior])]
+    if finite.size:
+        k = int(finite[np.argmax(poke[finite])])
         if poke[k] > clearance:
             blocked = True
             obstacle_idx = k

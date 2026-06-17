@@ -48,12 +48,13 @@ class DEMApp:
         tk.Frame(self.left_panel, height=2, bd=1, relief=tk.SUNKEN).pack(fill=tk.X, pady=8)
 
         # Crater parameters
-        self.e_lon0 = self._add_entry("Center lon", "-58.7061")
+        self.e_lon0 = self._add_entry("Center lon", "301.2939")
         self.e_lat0 = self._add_entry("Center lat", "7.2689")
         self.e_radius = self._add_entry("Radius (m)", "300")
-        self.e_lonA = self._add_entry("Point A lon", "-58.6971")
+        self.e_lonA = self._add_entry("Point A lon", "301.3029")
         self.e_latA = self._add_entry("Point A lat", "7.2705")
         self.e_step = self._add_entry("Step (deg)", "10")
+        self.e_clearance = self._add_entry("Clearance (m)", "4")
 
         # Crater buttons
         tk.Button(self.left_panel, text="Crop & Show Crater", command=self.show_crater,
@@ -102,6 +103,9 @@ class DEMApp:
         latA = float(self.e_latA.get())
         step = float(self.e_step.get())
         return lon0, lat0, radius, lonA, latA, step
+
+    def _clearance(self):
+        return float(self.e_clearance.get())
 
     def _ensure_crater(self):
         if self.full_meta_data is None:
@@ -199,7 +203,7 @@ class DEMApp:
         try:
             lon0, lat0, radius, lonA, latA, _ = self._params()
             meta = self._ensure_crater()
-            los = line_of_sight(meta['data'], meta, (lonA, latA), (lon0, lat0))
+            los = line_of_sight(meta['data'], meta, (lonA, latA), (lon0, lat0), clearance=self._clearance())
             self._draw_figure(create_profile_plot(los))
             if los['blocked']:
                 self._set_info(
@@ -215,7 +219,7 @@ class DEMApp:
         try:
             lon0, lat0, radius, lonA, latA, step = self._params()
             meta = self._ensure_crater()
-            rows = traverse_edges(meta['data'], meta, (lon0, lat0), (lonA, latA), radius, step_deg=step)
+            rows = traverse_edges(meta['data'], meta, (lon0, lat0), (lonA, latA), radius, step_deg=step, clearance=self._clearance())
 
             lines = []
             for r in rows:
